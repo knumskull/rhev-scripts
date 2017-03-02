@@ -53,8 +53,8 @@ This script will run through following steps.
 2. count number of disks in the recently created snapshot
 3. attach each disk to the virtual machine, which is checking the filesystems
 4. run the check routine on the filesystem
-4.1. running a mount-cycle for replaying filesystem log and log the activity
-4.2. when filesystem is unmounted, do a 'xfs_repair -n', followed by 'xfs_repair' twice. In sum you're running xfs_repair 3 times. All activity needs to be logged.
+    4.1. running a mount-cycle for replaying filesystem log and log the activity
+    4.2. when filesystem is unmounted, do a `xfs_repair -n`, followed by `xfs_repair` twice. In sum you're running xfs_repair 3 times. All activity will be logged.
 5. detaching the disks from the virtual machine, which checked the filesystems
 6. deleting the snapshot and wait until the snapshot is deleted (while snapshot status locked)
 
