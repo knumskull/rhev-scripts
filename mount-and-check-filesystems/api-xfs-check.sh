@@ -110,7 +110,7 @@ delete_snapshot () {
 
 check_mounted () {
   device=$1
-  mount | grep ${device}; echo $?
+  mount | grep ${device} >/dev/null; echo $?
 }
 
 
@@ -147,6 +147,7 @@ check_blk_device () {
 check_lvm_device () {
   PV=$1
   VG=$(/usr/sbin/lvm pvs ${PV} |grep ${PV} | awk -F" " '{print $2}')
+  VG_UUID=$(/usr/sbin/lvm lvs -a -o devices,vg_uuid | grep ${PV}| awk -F" " '{print $2}')
   /usr/sbin/lvm vgchange -ay ${VG} >"$log_path/activity.log"
 
   for LV in $(/usr/sbin/lvm lvs | grep ${VG} | grep -v swap | awk -F" " '{print $1}'); do
@@ -211,8 +212,16 @@ do_check_vm () {
   SNAPSHOT_ID=$(create_snapshot_of_vmid $VMID)
  
   # check_snapshot_status $VMID $SNAPSHOT_ID
+  # wait until snapshot isn't locked
   while [[ "locked" == "$(check_snapshot_status $VMID $SNAPSHOT_ID)" ]]; do sleep 2; done
-  echo "[$(date '+%c')] snapshot (id: ${SNAPSHOT_ID}) created." | tee -a activity.log
+  RC=$(check_snapshot_status $VMID $SNAPSHOT_ID >/dev/null 2>&1 | echo $?) 
+  # check if the snapshot is created successfully
+  if [ 0 -eq ${RC} ]; then
+    echo "[$(date '+%c')] snapshot (id: ${SNAPSHOT_ID}) created." | tee -a activity.log
+  else
+    echo "[$(date '+%c')] failed to create snapshot (id: ${SNAPSHOT_ID}). Aborting!" | tee -a activity.log
+    exit 1
+  fi
 
   cnt=$(get_disk_count $VMID $SNAPSHOT_ID)
   for ((i=0; i<cnt; i++)) 
