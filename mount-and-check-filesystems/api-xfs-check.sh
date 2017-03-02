@@ -148,7 +148,8 @@ check_lvm_device () {
   PV=$1
   VG=$(/usr/sbin/lvm pvs ${PV} |grep ${PV} | awk -F" " '{print $2}')
   VG_UUID=$(/usr/sbin/lvm lvs -a -o devices,vg_uuid | grep ${PV}| awk -F" " '{print $2}')
-  /usr/sbin/lvm vgchange -ay ${VG} >"$log_path/activity.log"
+  # activate the locigal volume
+  /usr/sbin/lvm vgchange -ay ${VG} >"${log_path}/activity.log"
 
   for LV in $(/usr/sbin/lvm lvs | grep ${VG} | grep -v swap | awk -F" " '{print $1}'); do
     lv_dev="/dev/${VG}/${LV}"
@@ -158,7 +159,9 @@ check_lvm_device () {
     xfs_repair "${lv_dev}" >"$log_path/${VG}-${dev_name}-repair" 2>&1
     xfs_repair "${lv_dev}" >"$log_path/${VG}-${dev_name}-post" 2>&1
   done
- 
+
+  # deactivate logical volume
+  /usr/sbin/lvm vgchange -an ${VG} >"${log_path}/activity.log"
 }
 
 check_devices () {
