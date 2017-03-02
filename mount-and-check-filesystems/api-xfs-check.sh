@@ -138,10 +138,10 @@ xfs_repair () {
 check_blk_device () {
   blk_dev=$1
   dev_name=${blk_dev##/dev*/}
-  mount_cycle "${lv_dev}" >"$log_path/${dev_name}-mount" 2>&1
-  xfs_check "${lv_dev}" >"$log_path/${dev_name}-check" 2>&1
-  xfs_repair "${lv_dev}" >"$log_path/${dev_name}-repair" 2>&1
-  xfs_repair "${lv_dev}" >"$log_path/${dev_name}-post" 2>&1
+  mount_cycle "${blk_dev}" >"$log_path/${dev_name}-mount" 2>&1
+  xfs_check "${blk_dev}" >"$log_path/${dev_name}-check" 2>&1
+  xfs_repair "${blk_dev}" >"$log_path/${dev_name}-repair" 2>&1
+  xfs_repair "${blk_dev}" >"$log_path/${dev_name}-post" 2>&1
 }
 
 check_lvm_device () {
@@ -152,10 +152,10 @@ check_lvm_device () {
   for LV in $(/usr/sbin/lvm lvs | grep ${VG} | grep -v swap | awk -F" " '{print $1}'); do
     lv_dev="/dev/${VG}/${LV}"
     dev_name=${lv_dev##/dev*/}
-    mount_cycle "${lv_dev}" >"$log_path/${dev_name}-mount" 2>&1
-    xfs_check "${lv_dev}" >"$log_path/${dev_name}-check" 2>&1
-    xfs_repair "${lv_dev}" >"$log_path/${dev_name}-repair" 2>&1
-    xfs_repair "${lv_dev}" >"$log_path/${dev_name}-post" 2>&1
+    mount_cycle "${lv_dev}" >"$log_path/${VG}-${dev_name}-mount" 2>&1
+    xfs_check "${lv_dev}" >"$log_path/${VG}-${dev_name}-check" 2>&1
+    xfs_repair "${lv_dev}" >"$log_path/${VG}-${dev_name}-repair" 2>&1
+    xfs_repair "${lv_dev}" >"$log_path/${VG}-${dev_name}-post" 2>&1
   done
  
 }
