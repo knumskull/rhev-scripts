@@ -126,22 +126,16 @@ mount_cycle () {
   umount ${device}
 }
 
-xfs_check () {
-  /usr/sbin/xfs_repair -n "$1"
-}
-
-
-xfs_repair () {
-  /usr/sbin/xfs_repair "$1"
-}
-
 check_blk_device () {
   blk_dev=$1
   dev_name=${blk_dev##/dev*/}
   mount_cycle "${blk_dev}" >"$log_path/${dev_name}-mount" 2>&1
-  xfs_check "${blk_dev}" >"$log_path/${dev_name}-check" 2>&1
-  xfs_repair "${blk_dev}" >"$log_path/${dev_name}-repair" 2>&1
-  xfs_repair "${blk_dev}" >"$log_path/${dev_name}-post" 2>&1
+  RC=$(/usr/sbin/xfs_repair -n "${blk_dev}" >"$log_path/${dev_name}-check" 2>&1; echo $?)
+  echo "[$(date +%c)] device: ${dev_name} - action: check - result: ${RC}" >> "$log_path/summary.log"
+  RC=$(/usr/sbin/xfs_repair "${blk_dev}" >"$log_path/${dev_name}-repair" 2>&1; echo $?)
+  echo "[$(date +%c)] device: ${dev_name} - action: repair - result: ${RC}" >> "$log_path/summary.log"
+  RC=$(/usr/sbin/xfs_repair "${blk_dev}" >"$log_path/${dev_name}-post" 2>&1; echo $?)
+  echo "[$(date +%c)] device: ${dev_name} - action: post_repair - result: ${RC}" >> "$log_path/summary.log"
 }
 
 check_lvm_device () {
@@ -149,19 +143,22 @@ check_lvm_device () {
   VG=$(/usr/sbin/lvm pvs ${PV} |grep ${PV} | awk -F" " '{print $2}')
   VG_UUID=$(/usr/sbin/lvm lvs -a -o devices,vg_uuid | grep ${PV}| awk -F" " '{print $2}')
   # activate the locigal volume
-  /usr/sbin/lvm vgchange -ay ${VG} >"${log_path}/activity.log"
+  /usr/sbin/lvm vgchange -a y ${VG} >>"${log_path}/activity.log"
 
   for LV in $(/usr/sbin/lvm lvs | grep ${VG} | grep -v swap | awk -F" " '{print $1}'); do
     lv_dev="/dev/${VG}/${LV}"
     dev_name=${lv_dev##/dev*/}
     mount_cycle "${lv_dev}" >"$log_path/${VG}-${dev_name}-mount" 2>&1
-    xfs_check "${lv_dev}" >"$log_path/${VG}-${dev_name}-check" 2>&1
-    xfs_repair "${lv_dev}" >"$log_path/${VG}-${dev_name}-repair" 2>&1
-    xfs_repair "${lv_dev}" >"$log_path/${VG}-${dev_name}-post" 2>&1
+    RC=$(/usr/sbin/xfs_repair -n "${lv_dev}" >"$log_path/${VG}-${dev_name}-check" 2>&1; echo $?)
+    echo "[$(date +%c)] device: ${VG}-${dev_name} - action: check - result: ${RC}" >> "$log_path/summary.log"
+    RC=$(/usr/sbin/xfs_repair "${lv_dev}" >"$log_path/${VG}-${dev_name}-repair" 2>&1; echo $?)
+    echo "[$(date +%c)] device: ${VG}-${dev_name} - action: repair - result: ${RC}" >> "$log_path/summary.log"
+    RC=$(/usr/sbin/xfs_repair "${lv_dev}" >"$log_path/${VG}-${dev_name}-post" 2>&1; echo $?)
+    echo "[$(date +%c)] device: ${VG}-${dev_name} - action: post_repair - result: ${RC}" >> "$log_path/summary.log"
   done
 
   # deactivate logical volume
-  /usr/sbin/lvm vgchange -an ${VG} >"${log_path}/activity.log"
+  /usr/sbin/lvm vgchange -a n ${VG} >>"${log_path}/activity.log"
 }
 
 check_devices () {
