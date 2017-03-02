@@ -214,9 +214,9 @@ do_check_vm () {
   # check_snapshot_status $VMID $SNAPSHOT_ID
   # wait until snapshot isn't locked
   while [[ "locked" == "$(check_snapshot_status $VMID $SNAPSHOT_ID)" ]]; do sleep 2; done
-  RC=$(check_snapshot_status $VMID $SNAPSHOT_ID >/dev/null 2>&1 | echo $?) 
+  RC=$(check_snapshot_status $VMID $SNAPSHOT_ID) 
   # check if the snapshot is created successfully
-  if [ 0 -eq ${RC} ]; then
+  if [ -n "${RC}" ]; then
     echo "[$(date '+%c')] snapshot (id: ${SNAPSHOT_ID}) created." | tee -a activity.log
   else
     echo "[$(date '+%c')] failed to create snapshot (id: ${SNAPSHOT_ID}). Aborting!" | tee -a activity.log
@@ -257,7 +257,15 @@ do_check_vm () {
 
   # check_snapshot_status $VMID $SNAPSHOT_ID
   while [[ "locked" == "$(check_snapshot_status $VMID $SNAPSHOT_ID)" ]]; do sleep 2; done
-  echo "[$(date '+%c')] snapshot (id: ${SNAPSHOT_ID}) deleted." | tee -a activity.log
+  RC=$(check_snapshot_status $VMID $SNAPSHOT_ID) 
+  # check if the snapshot is deleted successfully
+  if [ -z "${RC}" ]; then
+    echo "[$(date '+%c')] snapshot (id: ${SNAPSHOT_ID}) deleted." | tee -a activity.log
+  else
+    echo "[$(date '+%c')] failed to delete snapshot (id: ${SNAPSHOT_ID}) of VM (id: ${VMID}). Aborting!" | tee -a activity.log
+    exit 1
+  fi
+
 }
 
 ###########  MAIN  ###########
