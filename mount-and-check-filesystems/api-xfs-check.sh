@@ -140,7 +140,7 @@ check_blk_device () {
 
 check_lvm_device () {
   PV=$1
-  VG=$(/usr/sbin/lvm pvs ${PV} |grep ${PV} | awk -F" " '{print $2}')
+  VG=$(/usr/sbin/lvm pvs ${PV} 2>/dev/null |grep ${PV} | awk -F" " '{print $2}')
   VG_UUID=$(/usr/sbin/lvm lvs -a -o devices,vg_uuid | grep ${PV}| awk -F" " '{print $2}')
   # activate the locigal volume
   /usr/sbin/lvm vgchange -a y ${VG} >>"${log_path}/activity.log"
