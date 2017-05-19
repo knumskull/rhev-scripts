@@ -20,7 +20,7 @@ API_VERSION=3
 # name of virtual machine, which is used for running the repair actions
 # example: my-vm
 MGMT_VM=
-[[ -z "$MGMT_VM" ]] && echo "Please specify the name of the virtual machine. (e.g. MGMT_VM=my-vm)" && exit 1
+[[ -z "$MGMT_VM" ]] && echo "Please specify the name of the virtual machine. (e.g. MGMT_VM=
 
 # define API_HOST likei, 'rhev-m.example.com'
 API_HOST=""
@@ -76,9 +76,20 @@ CHECK_MGMT_VM_STATUS() {
 }
 
 get_vm_id () {
-  vm_name=$1
-  vm_id=$(curl -s --cacert ${CACERT} -X GET -H "Content-Type: application/xml" -H "Accept: application/json" -u "${API_CREDENTIALS}" "${API_URI}/vms?search={$vm_name}"  | python -c "import sys, json; print json.load(sys.stdin)['vm'][0]['id']") 
-  echo $vm_id
+  _vm_name=$1
+  _stdout=$(curl -s --cacert ${CACERT} -X GET -H "Content-Type: application/xml" -H "Accept: application/json" -u "${API_CREDENTIALS}" "${API_URI}/vms?search={$_vm_name}" )
+  _cnt=$(echo $_stdout | python -c "import sys, json; print len(json.load(sys.stdin)['vm'])")
+  _VM_ID=$(echo $_stdout | python -c "import sys, json; print json.load(sys.stdin)['vm'][0]['id']" 2>/dev/null)
+
+  if [ -z "$_VM_ID" ]; then
+    echo "[$(date '+%c')] [ERROR] The virtual machine with name '$_vm_name' was not found: "
+    exit 1
+  elif [ $_cnt -gt 1 ]; then
+    echo "[$(date '+%c')] [ERROR] The name of the virtual machine was not explicit enough. ($_vm_name). There are multiple VMs ($_cnt) with a similar name."
+    exit 1
+  else
+    echo $_VM_ID
+  fi
 }
 
 create_snapshot_of_vmid () {
@@ -230,65 +241,71 @@ do_check_vm () {
 
   # select VM for check
   VMID=$(get_vm_id $current_vm)
-  # 1. create snapshot
-  echo "[$(date '+%c')] [INFO ] creating snapshot of VM ${current_vm} (id: $VMID) ..." | tee -a activity.log
-  SNAPSHOT_ID=$(create_snapshot_of_vmid $VMID)
+
+  ## need this as workaround. If this line does not exist, the check inside of `get_vm_id` will be executed
+  ## inside the next `echo` command`
+  echo $VMID >/dev/null 2>&1 
+
+  if [ -n "$VMID" ]; then
+    # 1. create snapshot
+    echo "[$(date '+%c')] [INFO ] creating snapshot of VM ${current_vm} (id: $VMID) ..." | tee -a activity.log
+    SNAPSHOT_ID=$(create_snapshot_of_vmid $VMID)
  
-  # check_snapshot_status $VMID $SNAPSHOT_ID
-  # wait until snapshot isn't locked
-  while [[ "locked" == "$(check_snapshot_status $VMID $SNAPSHOT_ID)" ]]; do sleep 2; done
-  RC=$(check_snapshot_status $VMID $SNAPSHOT_ID) 
-  # check if the snapshot is created successfully
-  if [ -n "${RC}" ]; then
-    echo "[$(date '+%c')] [INFO ] snapshot (id: ${SNAPSHOT_ID}) created." | tee -a activity.log
-  else
-    echo "[$(date '+%c')] [ERROR] failed to create snapshot (id: ${SNAPSHOT_ID}). Aborting!" | tee -a activity.log
-    exit 1
-  fi
-
-  cnt=$(get_disk_count $VMID $SNAPSHOT_ID)
-  for ((i=0; i<cnt; i++)) 
-  do 
-    DID=$(get_disk_id $VMID $SNAPSHOT_ID $i)
-    # before attaching the disk to VM, the communication file between udev and this script needs to be flushed
-    echo > /tmp/added-xfs-devices.log
-    echo "[$(date '+%c')] [INFO ] Attaching Disk (id: $DID) to VM $MGMT_VM (id: $MGMT_VM_ID) ..." | tee -a activity.log
-    attach_disk_to_vm $DID $SNAPSHOT_ID $MGMT_VM_ID
-    echo "[$(date '+%c')] [INFO ] Disk (id: $DID) was attached." | tee -a activity.log
-
-    echo "[$(date '+%c')] [INFO ] running check on filesystem of disk (id: $DID)" | tee -a activity.log
-
-    ##### critical part #####
-    # just to be sure, the udev rules was running, wait 2 seconds
-    sleep 2
-    # aborting, if the communication file does not exist. 
-    if [ ! -f '/tmp/added-xfs-devices.log' ]; then
-      echo "[$(date '+%c')] [ERROR] something went wrong. The disks could not be identified. Nothing will be checked." | tee -a activity.log
+    # check_snapshot_status $VMID $SNAPSHOT_ID
+    # wait until snapshot isn't locked
+    while [[ "locked" == "$(check_snapshot_status $VMID $SNAPSHOT_ID)" ]]; do sleep 2; done
+    RC=$(check_snapshot_status $VMID $SNAPSHOT_ID) 
+    # check if the snapshot is created successfully
+    if [ -n "${RC}" ]; then
+      echo "[$(date '+%c')] [INFO ] snapshot (id: ${SNAPSHOT_ID}) created." | tee -a activity.log
     else
-      check_devices "${current_vm}" "/tmp/added-xfs-devices.log"
+      echo "[$(date '+%c')] [ERROR] failed to create snapshot (id: ${SNAPSHOT_ID}). Aborting!" | tee -a activity.log
+      exit 1
     fi
-    ##### end critical part #####
+
+    cnt=$(get_disk_count $VMID $SNAPSHOT_ID)
+    for ((i=0; i<cnt; i++)) 
+    do 
+      DID=$(get_disk_id $VMID $SNAPSHOT_ID $i)
+      # before attaching the disk to VM, the communication file between udev and this script needs to be flushed
+      echo > /tmp/added-xfs-devices.log
+      echo "[$(date '+%c')] [INFO ] Attaching Disk (id: $DID) to VM $MGMT_VM (id: $MGMT_VM_ID) ..." | tee -a activity.log
+      attach_disk_to_vm $DID $SNAPSHOT_ID $MGMT_VM_ID
+      echo "[$(date '+%c')] [INFO ] Disk (id: $DID) was attached." | tee -a activity.log
+
+      echo "[$(date '+%c')] [INFO ] running check on filesystem of disk (id: $DID)" | tee -a activity.log
+
+      ##### critical part #####
+      # just to be sure, the udev rules was running, wait 2 seconds
+      sleep 2
+      # aborting, if the communication file does not exist. 
+      if [ ! -f '/tmp/added-xfs-devices.log' ]; then
+        echo "[$(date '+%c')] [ERROR] something went wrong. The disks could not be identified. Nothing will be checked." | tee -a activity.log
+      else
+        check_devices "${current_vm}" "/tmp/added-xfs-devices.log"
+      fi
+      ##### end critical part #####
   
-    echo "[$(date '+%c')] [INFO ] detaching Disk (id: $DID) from VM $MGMT_VM (id: $MGMT_VM_ID) ..." | tee -a activity.log
-    detach_disk_from_vm $MGMT_VM_ID $DID
-    sleep 5
-    echo "[$(date '+%c')] [INFO ] Disk (id: $DID) was detached." | tee -a activity.log
-  done
+      echo "[$(date '+%c')] [INFO ] detaching Disk (id: $DID) from VM $MGMT_VM (id: $MGMT_VM_ID) ..." | tee -a activity.log
+      detach_disk_from_vm $MGMT_VM_ID $DID
+      sleep 5
+      echo "[$(date '+%c')] [INFO ] Disk (id: $DID) was detached." | tee -a activity.log
+    done
 
-  echo "[$(date '+%c')] [INFO ] deleting snapshot (id: ${SNAPSHOT_ID}) from VM $current_vm ..." | tee -a activity.log
-  delete_snapshot $VMID $SNAPSHOT_ID
+    echo "[$(date '+%c')] [INFO ] deleting snapshot (id: ${SNAPSHOT_ID}) from VM $current_vm ..." | tee -a activity.log
+    delete_snapshot $VMID $SNAPSHOT_ID
 
-  # check_snapshot_status $VMID $SNAPSHOT_ID
-  while [[ "locked" == "$(check_snapshot_status $VMID $SNAPSHOT_ID)" ]]; do sleep 2; done
-  RC=$(check_snapshot_status $VMID $SNAPSHOT_ID) 
-  # check if the snapshot is deleted successfully
-  if [ -z "${RC}" ]; then
-    echo "[$(date '+%c')] [INFO ] snapshot (id: ${SNAPSHOT_ID}) deleted." | tee -a activity.log
-  else
-    echo "[$(date '+%c')] [ERROR] failed to delete snapshot (id: ${SNAPSHOT_ID}) of VM (id: ${VMID}). Aborting!" | tee -a activity.log
-    exit 1
+    # check_snapshot_status $VMID $SNAPSHOT_ID
+    while [[ "locked" == "$(check_snapshot_status $VMID $SNAPSHOT_ID)" ]]; do sleep 2; done
+    RC=$(check_snapshot_status $VMID $SNAPSHOT_ID) 
+    # check if the snapshot is deleted successfully
+    if [ -z "${RC}" ]; then
+      echo "[$(date '+%c')] [INFO ] snapshot (id: ${SNAPSHOT_ID}) deleted." | tee -a activity.log
+    else
+      echo "[$(date '+%c')] [ERROR] failed to delete snapshot (id: ${SNAPSHOT_ID}) of VM (id: ${VMID}). Aborting!" | tee -a activity.log
+      exit 1
+    fi
   fi
-
 }
 
 ###########  MAIN  ###########
