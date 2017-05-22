@@ -20,9 +20,9 @@ API_VERSION=3
 # name of virtual machine, which is used for running the repair actions
 # example: my-vm
 MGMT_VM=
-[[ -z "$MGMT_VM" ]] && echo "Please specify the name of the virtual machine. (e.g. MGMT_VM=
+[[ -z "$MGMT_VM" ]] && echo "Please specify the name of the virtual machine. (e.g.  MGMT_VM=my-vm)" && exit 
 
-# define API_HOST likei, 'rhev-m.example.com'
+# define API_HOST like, 'rhev-m.example.com'
 API_HOST=""
 API_URI="https://${API_HOST}/ovirt-engine/api"
 API_USER=admin@internal
@@ -263,6 +263,7 @@ do_check_vm () {
       exit 1
     fi
 
+    ## 
     cnt=$(get_disk_count $VMID $SNAPSHOT_ID)
     for ((i=0; i<cnt; i++)) 
     do 
@@ -272,9 +273,11 @@ do_check_vm () {
       echo "[$(date '+%c')] [INFO ] Attaching Disk (id: $DID) to VM $MGMT_VM (id: $MGMT_VM_ID) ..." | tee -a activity.log
       attach_disk_to_vm $DID $SNAPSHOT_ID $MGMT_VM_ID
       echo "[$(date '+%c')] [INFO ] Disk (id: $DID) was attached." | tee -a activity.log
+    done
 
-      echo "[$(date '+%c')] [INFO ] running check on filesystem of disk (id: $DID)" | tee -a activity.log
-
+    ## 
+    for ((i=0; i<cnt; i++)) 
+    do 
       ##### critical part #####
       # just to be sure, the udev rules was running, wait 2 seconds
       sleep 2
@@ -282,10 +285,14 @@ do_check_vm () {
       if [ ! -f '/tmp/added-xfs-devices.log' ]; then
         echo "[$(date '+%c')] [ERROR] something went wrong. The disks could not be identified. Nothing will be checked." | tee -a activity.log
       else
-        check_devices "${current_vm}" "/tmp/added-xfs-devices.log"
+       echo "[$(date '+%c')] [INFO ] running check on filesystem of disk (id: $DID)" | tee -a activity.log
+       check_devices "${current_vm}" "/tmp/added-xfs-devices.log"
       fi
       ##### end critical part #####
-  
+    done
+
+    for ((i=0; i<cnt; i++)) 
+    do 
       echo "[$(date '+%c')] [INFO ] detaching Disk (id: $DID) from VM $MGMT_VM (id: $MGMT_VM_ID) ..." | tee -a activity.log
       detach_disk_from_vm $MGMT_VM_ID $DID
       sleep 5
