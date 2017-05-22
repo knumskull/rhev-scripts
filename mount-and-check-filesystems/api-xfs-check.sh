@@ -275,24 +275,21 @@ do_check_vm () {
       echo "[$(date '+%c')] [INFO ] Disk (id: $DID) was attached." | tee -a activity.log
     done
 
-    ## 
-    for ((i=0; i<cnt; i++)) 
-    do 
-      ##### critical part #####
-      # just to be sure, the udev rules was running, wait 2 seconds
-      sleep 2
-      # aborting, if the communication file does not exist. 
-      if [ ! -f '/tmp/added-xfs-devices.log' ]; then
-        echo "[$(date '+%c')] [ERROR] something went wrong. The disks could not be identified. Nothing will be checked." | tee -a activity.log
-      else
-       echo "[$(date '+%c')] [INFO ] running check on filesystem of disk (id: $DID)" | tee -a activity.log
-       check_devices "${current_vm}" "/tmp/added-xfs-devices.log"
-      fi
-      ##### end critical part #####
-    done
+    ##### critical part #####
+    # just to be sure, the udev rules was running, wait 2 seconds
+    sleep 2
+    # aborting, if the communication file does not exist. 
+    if [ ! -f '/tmp/added-xfs-devices.log' ]; then
+      echo "[$(date '+%c')] [ERROR] something went wrong. The disks could not be identified. Nothing will be checked." | tee -a activity.log
+    else
+     echo "[$(date '+%c')] [INFO ] running check on filesystem of disk (id: $DID)" | tee -a activity.log
+     check_devices "${current_vm}" "/tmp/added-xfs-devices.log"
+    fi
+    ##### end critical part #####
 
     for ((i=0; i<cnt; i++)) 
     do 
+      DID=$(get_disk_id $VMID $SNAPSHOT_ID $i)
       echo "[$(date '+%c')] [INFO ] detaching Disk (id: $DID) from VM $MGMT_VM (id: $MGMT_VM_ID) ..." | tee -a activity.log
       detach_disk_from_vm $MGMT_VM_ID $DID
       sleep 5
