@@ -64,35 +64,54 @@ get_host_id () {
 }
 
 get_pm_status () {
-  _host_name=$1
-  _host_id=$(get_host_id ${_host_name})
+  _hostname=$1
+  _host_id=$(get_host_id ${_hostname})
   _stdout=$(curl -s --cacert ${CACERT} -X GET -H "Content-Type: application/xml" -H "Accept: application/json" -u "${API_CREDENTIALS}" "${API_URI}/hosts/${_host_id}" )
   _HOST_PM_STATUS=$(echo $_stdout | python -c "import sys, json; print json.load(sys.stdin)['power_management']['enabled']" 2>/dev/null)
 
   echo $_HOST_PM_STATUS
 }
 
+set_pm (){
+  _hostname=$1
+  _status=$([[ "enable" == "$2" ]] && echo "true" || echo "false" )
+  _host_id=$(get_host_id ${_hostname})
+  _stdout=$(curl -s --cacert ${CACERT} -X PUT -k -H "Content-Type: application/xml" -H "Accept: application/json" -u "${API_CREDENTIALS}" "${API_URI}/hosts/${_host_id}" -d "<host><power_management><enabled>${_status}</enabled></power_management></host>")
+  _HOST_PM_STATUS=$(echo $_stdout | python -c "import sys, json; print json.load(sys.stdin)['power_management']['enabled']" 2>/dev/null)
+
+  echo $_HOST_PM_STATUS
+}
+
+translate_status() {
+  _state=$1
+  [[ "${_state}" == "true" ]] && echo "ON" || echo "OFF"
+}
+
 usage () {
   echo "usage: `basename $0` [status|disable|enable] <hostname>"
+  echo "    status <hostname>  -> print current powermanagement status."
+  echo "    enable <hostname>  -> enable powermanagement on host <hostname>. "
+  echo "    disable <hostname> -> disable powermanagement on host <hostname>. "
   exit 1
-
-
 }
 
 
 main () {
-  [ -n "$2" ] && _HOST=$2 || (echo "You need to specify a hostname"; usage)
-  case $1 in
+  _OPTION=$1
+  [[ -z "$2" ]] && usage || _HOST=$2
+  [[ -z "${_OPTION}" ]] && usage
+  case ${_OPTION} in
    "status")
        echo -n "Powermanagement Status of Host ${_HOST}: "
-       _state=$(get_pm_status ${_HOST})
-       [[ "${_state}" == "true" ]] && echo "ON" || echo "OFF"
-       ;;
+       translate_status $(get_pm_status ${_HOST})
+              ;;
    "disable")
-       echo -n "Disable Powermanagement on Host ${_HOST} ..."
+       echo -n "Disable Powermanagement on Host ${_HOST} ... "
+       translate_status $(set_pm ${_HOST} ${_OPTION})
        ;;
    "enable")
-       echo -n "Enable Powermanagement on Host ${_HOST} ..."
+       echo -n "Enable Powermanagement on Host ${_HOST} ... "
+       translate_status $(set_pm ${_HOST} ${_OPTION})
        ;;
    *) echo invalid option;;
   esac
