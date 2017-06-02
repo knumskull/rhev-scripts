@@ -1,2 +1,6 @@
 .apipasswd
 ca.crt
+enable.sh
+disable.sh
+logging/**
+activity.log
