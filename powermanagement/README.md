@@ -4,6 +4,30 @@
 This small script provides the ability to disable and enable the power management of a hypervisor.
 The only restriction to this is, that the power management has to be configured well, before using this script.
 
+
+## Setup Configuration
+Open file `pm.sh` and define the variables `API_HOST` and `API_USER`.
+
+Example:
+~~~
+API_HOST="rhev-m.example.com"
+API_USER=admin@internal
+~~~
+
+### Setup password
+The password for the RHEV-API user is stored in the file `.apipasswd` beside the script `pm.sh`.
+Example:
+~~~
+$: cat .apipasswd
+redhat
+~~~
+
+For gaining a minimum of security, this file should not be accessible by others than the owner itself.
+~~~
+chmod 600 .apipasswd
+~~~
+
+
 ## Usage
 ~~~
 usage: pm.sh [status|disable|enable] <hostname>

@@ -18,7 +18,7 @@
 API_VERSION=3
 
 # define API_HOST like, 'rhev-m.example.com'
-API_HOST="rhevm-a.rhev.gsslab.bne.redhat.com"
+API_HOST=""
 API_URI="https://${API_HOST}/ovirt-engine/api"
 API_USER=admin@internal
 
